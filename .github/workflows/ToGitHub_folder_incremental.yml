@@ -1,7 +1,6 @@
 name: To GitHub ☞ folder incremental ✔
 
 on:
-  # UTC 时间22:05触发，北京时间次日6:05
   schedule:
     - cron: '5 22 * * *'
   workflow_dispatch:
@@ -29,17 +28,21 @@ jobs:
         with:
           path: src
 
-      # 2. 克隆目标仓库
+      # 2. 克隆目标仓库（修复引号语法错误）
       - name: Clone Target
         run: |
-          # GitHub 仓库地址（用户名xiaoran79，仓库名update）
-          GITHUB_USER="xiaoran79" # 变量名
+          GITHUB_USER="xiaoran79"
           GITHUB_REPO="${{ inputs.target-repo || 'update' }}"
+          # 正确的URL引号格式
           git clone --depth=1 \
-            "https://${GITHUB_USER}:${{ secrets.CUSTOM_GITHUB_TOKEN }}"@github.com/${GITHUB_USER}/${GITHUB_REPO}.git" \
-            target # 改域名、令牌名
+            "https://${GITHUB_USER}:${{ secrets.CUSTOM_GITHUB_TOKEN }}@github.com/${GITHUB_USER}/${GITHUB_REPO}.git" \
+            target
 
-      # 3. 计算源文件夹哈希（校验文件一致性）
+      # 新增：安装rsync（Ubuntu默认无此工具）
+      - name: Install rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
+      # 3. 计算源文件夹哈希
       - name: Hash Source
         id: hash_src
         run: |
@@ -47,7 +50,7 @@ jobs:
           SRC_HASH=$(find "${{ inputs.source-folder || 'output' }}" -type f -exec sha1sum {} + | sort | sha1sum | awk '{print $1}')
           echo "SRC_HASH=$SRC_HASH" >> $GITHUB_ENV
 
-      # 4. 计算目标文件夹哈希（不存在则设默认值）
+      # 4. 计算目标文件夹哈希
       - name: Hash Target
         id: hash_tgt
         run: |
@@ -58,7 +61,7 @@ jobs:
           fi
           echo "TGT_HASH=$TGT_HASH" >> $GITHUB_ENV
 
-      # 5. 比较哈希值，判断是否需要同步
+      # 5. 比较哈希值
       - name: Compare Hashes
         run: |
           echo "源文件夹哈希: ${{ env.SRC_HASH }}"
@@ -71,26 +74,24 @@ jobs:
             echo "SYNC_NEEDED=true" >> $GITHUB_ENV
           fi
 
-      # 6. 增量同步（保留差异文件，删除目标端多余文件）
+      # 6. 增量同步
       - name: Incremental Sync
         if: env.SYNC_NEEDED == 'true'
         run: |
           rsync -av --delete "src/${{ inputs.source-folder || 'output' }}/" "target/${{ inputs.target-subdir || 'output' }}/"
 
-      # 7. 检查目标仓库是否有实际文件变化
+      # 7. 检查目标仓库变化
       - name: Check Target Changes
         if: env.SYNC_NEEDED == 'true'
-        id: check_changes
         run: |
           cd target
-          git status --porcelain
           if [ -n "$(git status --porcelain)" ]; then
             echo "CHANGES_DETECTED=true" >> $GITHUB_ENV
           else
             echo "CHANGES_DETECTED=false" >> $GITHUB_ENV
           fi
 
-      # 8. 提交并推送更新（仅当有变化时）
+      # 8. 提交并推送
       - name: Commit and Push
         if: env.SYNC_NEEDED == 'true' && env.CHANGES_DETECTED == 'true'
         run: |
@@ -101,15 +102,15 @@ jobs:
           git commit -m "✅ $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S')"
           git push origin HEAD
 
-      # 9. 输出同步结果报告（改描述）
+      # 9. 同步结果报告
       - name: Sync Report
         run: |
           if [ "$SYNC_NEEDED" = "true" ]; then
             if [ "$CHANGES_DETECTED" = "true" ]; then
               echo "✅ 已完成 GitHub 增量同步并推送更新"
             else
-              echo "ℹ️ 增量同步未检测到实际文件变化（可能为哈希冲突）"
+              echo "ℹ️ 增量同步未检测到实际文件变化"
             fi
           else
-            echo "ℹ️ 无需同步：GitHub 源与 GitHub 目标内容一致"
+            echo "ℹ️ 无需同步：源与目标内容一致"
           fi
