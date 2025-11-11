@@ -36,7 +36,7 @@ jobs:
           GITHUB_USER="xiaoran79" # 变量名
           GITHUB_REPO="${{ inputs.target-repo || 'update' }}"
           git clone --depth=1 \
-            "https://${GITHUB_USER}:${{ secrets.GITHUB_ACCESS_TOKEN }}"@github.com/${GITHUB_USER}/${GITHUB_REPO}.git" \
+            "https://${GITHUB_USER}:${{ secrets.CUSTOM_GITHUB_TOKEN }}"@github.com/${GITHUB_USER}/${GITHUB_REPO}.git" \
             target # 改域名、令牌名
 
       # 3. 计算源文件夹哈希（校验文件一致性）
