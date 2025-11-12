@@ -98,11 +98,33 @@ jobs:
             exit 1;
           fi
 
-      - name: 清理历史归档
+      - name: 清理历史归档（按文件名日期）
         run: |
           mkdir -p ${{ env.HISTORY_DIR }}  # 确保归档目录存在
-          # 删除超过保留天数的历史归档文件
-          find ${{ env.HISTORY_DIR }} -name "*.zip" -type f -mtime +${{ env.RETAIN_DAYS }} -delete
+          # 计算需要保留的最早日期（格式：YYYYMMDD）
+          retain_date=$(date -d "-${{ env.RETAIN_DAYS }} days" +"%Y%m%d")
+          echo "保留日期：$retain_date 及之后的归档"
+          
+          # 遍历归档目录下的zip文件，按文件名日期删除过期文件
+          for zip_file in "${{ env.HISTORY_DIR }}"/*.zip; do
+            # 跳过不存在的文件（防止目录为空时报错）
+            [ -f "$zip_file" ] || continue
+            
+            # 从文件名中提取日期部分（如20250824）
+            file_date=$(basename "$zip_file" | cut -d'_' -f1)
+            # 验证提取的日期是否为8位数字
+            if [[ "$file_date" =~ ^[0-9]{8}$ ]]; then
+              # 比较文件名日期与保留日期，删除早于保留日期的文件
+              if [ "$file_date" -lt "$retain_date" ]; then
+                echo "删除过期归档：$zip_file"
+                rm -f "$zip_file"
+              else
+                echo "保留归档：$zip_file"
+              fi
+            else
+              echo "忽略非标准命名文件：$zip_file"
+            fi
+          done
 
       - name: 生成今日归档
         run: |
