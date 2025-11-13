@@ -110,7 +110,7 @@ jobs:
             echo "错误：目标仓库Token（${{ inputs.target_token_name }}）不存在" && exit 1
           fi
 
-      # 修复：检查并创建目标仓库（修正引号语法）
+      # 修复：用jq构建JSON，彻底解决引号问题
       - name: 📦 检查并创建目标仓库
         run: |
           TARGET_TOKEN="${{ secrets[env.target_token_name] }}"
@@ -122,18 +122,24 @@ jobs:
           
           if [ "$REPO_EXISTS" -eq 404 ]; then
             echo "ℹ️ 目标仓库不存在，开始创建..."
-            # 修正引号拼接逻辑（解决EOF错误）
+            # 用jq构建JSON（避免引号嵌套错误）
+            CREATE_BODY=$(jq -n \
+              --arg name "${{ env.target_repo }}" \
+              --argjson private ${{ inputs.target_private }} \
+              --arg default_branch "${{ env.target_branch }}" \
+              '{
+                "name": $name,
+                "private": $private,
+                "auto_init": true,
+                "default_branch": $default_branch
+              }')
+            # 调用API创建仓库
             CREATE_RESPONSE=$(curl -s -w "%{http_code}" -o create_result.json \
               -X POST \
               -H "Authorization: token $TARGET_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               "https://api.github.com/user/repos" \
-              -d '{
-                "name": "'"${{ env.target_repo }}'",
-                "private": '"${{ inputs.target_private }}'",
-                "auto_init": true,
-                "default_branch": "'"${{ env.target_branch }}'"
-              }')
+              -d "$CREATE_BODY")
             if [ "$CREATE_RESPONSE" -eq 201 ]; then
               echo "✅ 目标仓库创建成功"
             else
