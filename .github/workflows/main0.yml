@@ -1,103 +1,92 @@
-name: 'Daily Update main⁰ ☞ ✔'
-
+name: 'Daily Update main ☞ ✔'
 on:
   schedule:
-    - cron: '00 21 * * *'  # 触发时间（UTC时间）
-    - cron: '00 09 * * *'  # 触发时间（UTC时间）
+    - cron: '50 20 * * *'
   workflow_dispatch:
+    branches: [main]
     inputs:
       environment:
         description: '部署环境'
         required: true
-        default: 'production'  # 手动触发时的默认环境
-
+        default: 'production'  # 手动触发默认环境
 env:
-  PYTHON_VERSION: '3.10'        # 指定使用的Python版本
-  RETAIN_DAYS: 7                # 历史归档文件保留天数
-  HISTORY_DIR: 'history/main0'        # 历史归档文件存储目录
-  FILES_TO_ARCHIVE: >-          # 需要归档的文件列表
-    output/full.txt
-    output/simple.txt
-    output/others.txt
-    output/sports.html
-    output/custom.txt
-
+  PYTHON_VERSION: '3.12'  # 指定Python版本
+  RETAIN_DAYS: 7          # 历史归档保留天数（超期自动删除）
+  HISTORY_DIR: 'history'  # 归档文件存储目录（独立子目录区分脚本）
+  FILES_TO_ARCHIVE: output/result.txt output/result.m3u  # 需归档的文件列表
 jobs:
-  run_job:
-    runs-on: ubuntu-latest
+  update_and_push:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120  # 任务超时时间（2小时）
     permissions:
-      contents: write          # 允许写入仓库内容
-      pull-requests: write     # 允许操作Pull Requests
-
+      contents: write  # 允许写入仓库内容
     steps:
-      - name: 拉取仓库代码
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: main  # 拉取main分支代码
-
-      - name: 强制同步远程代码
-        run: git fetch --prune && git reset --hard origin/main  # 确保本地代码与远程完全一致（应对仓库重建）
-
-      - name: 安装Python
+          fetch-depth: 0  # 拉取完整提交历史
+      - name: 强制拉取最新代码
+        run: git fetch --prune && git reset --hard origin/main  # 确保本地与远程代码完全同步
+      - name: Debug branch
+        run: |
+          echo "当前分支: $(git rev-parse --abbrev-ref HEAD)"  # 输出当前分支名称
+          echo "当前提交: $(git rev-parse HEAD)"  # 输出当前提交哈希
+      - name: 创建输出目录
+        run: mkdir -p output  # 确保output目录存在（若不存在则创建）
+      - name: 检测Chrome依赖配置
+        run: |
+          # 从配置读取是否启用浏览器驱动，写入环境变量
+          echo "OPEN_DRIVER=$(python -c '
+          try:
+            from utils.config import config
+            print(config.open_driver)
+          except:
+            print(False)')" >> $GITHUB_ENV
+      - name: 安装Chrome浏览器（如需）
+        if: env.OPEN_DRIVER == 'True'  # 仅启用浏览器驱动时执行
+        uses: browser-actions/setup-chrome@latest
+        with:
+          chrome-version: stable  # 安装稳定版Chrome
+      - name: 安装ChromeDriver（如需）
+        if: env.OPEN_DRIVER == 'True'  # 仅启用浏览器驱动时执行
+        uses: nanasess/setup-chromedriver@master  # 安装对应版本ChromeDriver
+      - name: 安装FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg  # 安装多媒体处理工具
+      - name: 配置Python 3.12环境
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}  # 配置指定版本的Python环境
-
-      - name: 缓存依赖包
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip  # 缓存pip依赖的路径
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}  # 缓存键（基于依赖文件哈希）
-          restore-keys: |
-            ${{ runner.os }}-pip-  # 缓存恢复规则
-
-      - name: 安装依赖
+          python-version: '3.12'  # 指定Python版本
+          cache: 'pipenv'  # 启用pipenv依赖缓存
+      - name: 安装项目依赖
         run: |
-          python -m pip install --upgrade pip  # 升级pip工具
-          # 安装核心依赖包，失败时重试一次
-          pip install opencc-python-reimplemented pytz || { 
-            echo "依赖安装失败，重试一次"; 
-            pip install opencc-python-reimplemented pytz; 
-          }
-
-      - name: 同步代码并生成文件
-        run: |
-          # 配置Git提交身份信息
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-          git reset --hard HEAD  # 重置本地未提交的修改
-          # 拉取远程更新，处理可能的冲突
-          git pull origin main --rebase || { 
-            echo "变基冲突，自动用远程最新代码覆盖本地";
-            git rebase --abort;
-            git pull origin main --force;
-          }
-          # 执行主脚本生成文件，失败时重试一次
-          python main0.py || { 
-            echo "首次生成文件失败，重试一次"; 
-            python main0.py || { 
-              echo "生成文件失败，终止流程"; 
-              exit 1; 
-            } 
-          }
-
-      - name: 校验文件完整性
-        run: |
-          # 定义需要校验的关键文件列表
-          critical_files=("output/full.txt" "output/custom.txt")
-          # 检查每个关键文件是否存在且非空
-          for file in "${critical_files[@]}"; do
-            if [ ! -s "$file" ]; then
-              echo "错误：$file 为空或不存在，终止提交";
-              exit 1;
-            fi
-          done
-          # 检查核心分类内容是否存在
-          if ! grep -q "🌐央视频道,#genre#" "output/custom.txt"; then
-            echo "错误：output/custom.txt 缺失关键分类，终止提交";
-            exit 1;
+          pip3 install --user pipenv  # 安装pipenv虚拟环境工具
+          pipenv --python 3.12  # 指定Python版本创建虚拟环境
+          pipenv install --deploy  # 从Pipfile.lock部署依赖
+          pipenv install pytz  # 安装时区处理依赖
+          # 启用浏览器驱动时额外安装selenium
+          if [[ ${{ env.OPEN_DRIVER }} == 'True' ]]; then
+            pipenv install selenium
           fi
-
+      - name: 执行更新脚本
+        run: |
+          export FINAL_FILE=output/result.txt  # 定义输出文件路径环境变量
+          export CACHE_FILE=output/cache.pkl  # 定义缓存文件路径环境变量
+          pipenv run python main.py  # 使用pipenv虚拟环境运行主脚本
+      - name: 检查脚本执行结果
+        if: always()  # 无论前一步是否成功都执行
+        run: |
+          # 脚本退出码非0时输出错误并终止
+          if [[ $? -ne 0 ]]; then
+            echo "脚本运行失败，退出码: $?"
+            exit 1
+          fi
+      - name: 调试输出目录权限
+        run: |
+          echo "output 目录权限:"
+          ls -ld output/  # 输出目录权限信息
+          echo "文件列表:"
+          ls -l output/  # 输出目录内文件列表
       - name: 清理历史归档（按文件名日期）
         run: |
           mkdir -p ${{ env.HISTORY_DIR }}  # 确保归档目录存在
@@ -125,43 +114,39 @@ jobs:
               echo "忽略非标准命名文件：$zip_file"
             fi
           done
-
       - name: 生成今日归档
         run: |
-          # 检查目标文件是否有修改
+          # 检查文件是否有修改（无修改则跳过）
           if git diff --quiet ${{ env.FILES_TO_ARCHIVE }}; then
-            echo "文件未修改，不生成新归档";
-          else
-            # 生成带时间戳的归档文件
-            current_datetime=$(date +"%Y%m%d_%H%M%S")
-            zip_filename="${{ env.HISTORY_DIR }}/${current_datetime}_main0.zip"
-            zip -j "${zip_filename}" ${{ env.FILES_TO_ARCHIVE }}  # 打包文件（不保留目录结构）
-            git add "${zip_filename}"  # 将归档文件加入版本控制
-            echo "新归档生成：${zip_filename}"
+            echo "文件未修改，跳过归档"
+            exit 0
           fi
-
-      - name: 提交并推送更改
+          # 生成带时间戳的归档文件名
+          current_datetime=$(date +"%Y%m%d_%H%M%S")
+          zip_filename="${{ env.HISTORY_DIR }}/${current_datetime}_main.zip"
+          # 打包文件（-j 不保留目录结构，仅打包文件本身）
+          zip -j "${zip_filename}" ${{ env.FILES_TO_ARCHIVE }}
+          # 将归档文件加入Git版本控制
+          git add "${zip_filename}"
+          echo "新归档已生成: ${zip_filename}"
+      - name: 安全提交更改
         run: |
-          # 添加需要提交的文件（生成结果和归档文件）
-          git add output/full.txt output/full.m3u output/simple.txt output/simple.m3u output/others.txt output/sports.html output/custom.txt output/custom.m3u ${{ env.HISTORY_DIR }}/
-          # 提交修改（无修改时不报错）
-          git commit -m "🐲 $(date +'%Y-%m-%d %H:%M:%S')" || echo "无主文件修改需提交"
-          # 拉取远程更新并处理冲突
-          git pull origin main --rebase --autostash --allow-unrelated-histories || git pull origin main --force
-          # 推送修改，优先安全推送，失败时强制推送
+          # 配置Git提交身份信息
+          git config --local user.email "bot@github.com"
+          git config --local user.name "Stable Bot"
+          git add -A  # 添加所有变更（兜底）
+          git add -f output/result.txt output/result.m3u  # 强制添加关键输出文件
+          # 无可提交变更时退出
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m ":turtle: $(date +'%Y-%m-%d %H:%M:%S')"  # 提交带时间戳的变更
+          # 处理拉取冲突
+          git pull origin main --rebase --autostash --allow-unrelated-histories || {
+            echo "变基冲突，自动覆盖本地代码";
+            git rebase --abort;
+            git pull origin main --force;
+          }
+          # 推送变更（优先安全推送，失败时强制推送）
           git push origin main --force-with-lease || git push origin main --force
-
-      - name: 保存生成的文件
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-files  #  artifacts名称
-          path: |  # 需要保存的生成文件和归档文件
-            output/full.txt
-            output/full.m3u
-            output/simple.txt
-            output/simple.m3u
-            output/others.txt
-            output/sports.html
-            output/custom.txt
-            output/custom.m3u
-            ${{ env.HISTORY_DIR }}/*.zip
