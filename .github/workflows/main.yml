@@ -106,8 +106,8 @@ jobs:
       - name: 清理历史归档
         run: |
           mkdir -p ${{ env.HISTORY_DIR }}  # 确保归档目录存在
-          # 删除超过保留天数的归档文件（仅清理.zip格式）
-          find ${{ env.HISTORY_DIR }} -name "*.zip" -type f -mtime +${{ env.RETAIN_DAYS }} -delete
+          # 安全清理：仅删除HISTORY_DIR下、后缀为.zip、且超过保留天数的文件
+          find ${{ env.HISTORY_DIR }} -maxdepth 1 -name "*.zip" -type f -mtime +${{ env.RETAIN_DAYS }} -delete
 
       - name: 生成今日归档
         run: |
