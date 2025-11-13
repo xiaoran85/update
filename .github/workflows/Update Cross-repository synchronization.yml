@@ -24,7 +24,7 @@ on:
         description: '目标仓库信息（用户/仓库名@分支）'
         type: string
         required: true
-        default: 'xiaoran67/update001@main'
+        default: 'xiaoran67/update1@main'
       target_folder:
         description: '目标仓库接收路径（留空=根目录）'
         type: string
@@ -108,6 +108,44 @@ jobs:
           # 校验目标Token
           if [ -z "${{ secrets[inputs.target_token_name] }}" ]; then
             echo "错误：目标仓库Token（${{ inputs.target_token_name }}）不存在" && exit 1
+          fi
+
+      # 新增步骤：创建目标仓库（若不存在）
+      - name: 📦 检查并创建目标仓库
+        run: |
+          TARGET_TOKEN="${{ secrets[env.target_token_name] }}"
+          # 检查仓库是否存在
+          REPO_CHECK_URL="https://api.github.com/repos/${{ env.target_user }}/${{ env.target_repo }}"
+          REPO_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token $TARGET_TOKEN" \
+            "$REPO_CHECK_URL")
+          
+          if [ "$REPO_EXISTS" -eq 404 ]; then
+            echo "ℹ️ 目标仓库不存在，开始创建..."
+            # 调用GitHub API创建仓库（含默认分支）
+            CREATE_RESPONSE=$(curl -s -w "%{http_code}" -o create_result.json \
+              -X POST \
+              -H "Authorization: token $TARGET_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/user/repos" \
+              -d '{
+                "name": "'"${{ env.target_repo }}'",
+                "private": '"${{ inputs.target_private }}'",
+                "auto_init": true,
+                "default_branch": "'"${{ env.target_branch }}'"'
+              }')
+            if [ "$CREATE_RESPONSE" -eq 201 ]; then
+              echo "✅ 目标仓库创建成功"
+            else
+              echo "❌ 目标仓库创建失败，API返回码：$CREATE_RESPONSE"
+              cat create_result.json
+              exit 1
+            fi
+          elif [ "$REPO_EXISTS" -eq 200 ]; then
+            echo "ℹ️ 目标仓库已存在，跳过创建"
+          else
+            echo "❌ 检查仓库状态失败，HTTP状态码：$REPO_EXISTS"
+            exit 1
           fi
 
       # 3. 检出源仓库
@@ -208,14 +246,14 @@ jobs:
           TGT_INFO="${{ env.target_user }}/${{ env.target_repo }}:${{ env.target_branch }}[${{ inputs.target_folder || '根目录' }}]"
           
           if [ "${{ inputs.commit_template }}" = "仅时间" ]; then
-            COMMIT_MSG="✅ ${CURRENT_DATE}"
+            COMMIT_MSG="🚀 ${CURRENT_DATE}"
           elif [ "${{ inputs.commit_template }}" = "同步说明" ]; then
             COMMIT_MSG="🔄 同步 ${SRC_INFO} → ${TGT_INFO}（${CURRENT_DATE}）"
           elif [ "${{ inputs.commit_template }}" = "自定义" ]; then
             COMMIT_MSG="${{ inputs.custom_commit_msg }}"
-            [ -z "$COMMIT_MSG" ] && COMMIT_MSG="✅ ${CURRENT_DATE}"
+            [ -z "$COMMIT_MSG" ] && COMMIT_MSG="🚀 ${CURRENT_DATE}"
           else
-            COMMIT_MSG="✅ ${CURRENT_DATE}"
+            COMMIT_MSG="🚀 ${CURRENT_DATE}"
           fi
           
           git commit -m "$COMMIT_MSG"
