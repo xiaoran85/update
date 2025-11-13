@@ -110,7 +110,7 @@ jobs:
             echo "错误：目标仓库Token（${{ inputs.target_token_name }}）不存在" && exit 1
           fi
 
-      # 新增步骤：创建目标仓库（若不存在）
+      # 修复：检查并创建目标仓库（修正引号语法）
       - name: 📦 检查并创建目标仓库
         run: |
           TARGET_TOKEN="${{ secrets[env.target_token_name] }}"
@@ -122,7 +122,7 @@ jobs:
           
           if [ "$REPO_EXISTS" -eq 404 ]; then
             echo "ℹ️ 目标仓库不存在，开始创建..."
-            # 调用GitHub API创建仓库（含默认分支）
+            # 修正JSON参数的引号拼接逻辑
             CREATE_RESPONSE=$(curl -s -w "%{http_code}" -o create_result.json \
               -X POST \
               -H "Authorization: token $TARGET_TOKEN" \
