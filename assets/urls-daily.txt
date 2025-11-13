@@ -1,5 +1,5 @@
 # 这是订阅源列表，每行一个订阅地址
-# This is a list of subscription sources, with one subscription address per line
+#这是订阅源列表，每行一个订阅地址
 
 https://raw.githubusercontent.com/develop202/migu_video/refs/heads/main/interface.txt
 
@@ -47,17 +47,15 @@ https://raw.githubusercontent.com/mlzlzj/hnyuan/refs/heads/main/iptv_list.txt
 https://raw.githubusercontent.com/kimwang1978/TV/master/output/result.txt
 https://raw.githubusercontent.com/Guovin/TV/gd/output/result.txt
 
-https://raw.githubusercontent.com/lystv/short/main/影视 /tvb/MTV.txt
+https://raw.githubusercontent.com/lystv/short/main/影像/tvb/MTV.txt
 https://live.zbds.org/tv/iptv4.txt
 
 https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/result.txt
-https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/others.txt
-https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/full.txt
-https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/custom1/full.txt
-https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/custom2/full.txt
-https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/custom3/full.txt
 
-https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/special/live_special.txt
+https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/full.txt
+
+
+
 
 https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/library/live/b/%E6%94%B6%E8%97%8F%E9%A2%91%E9%81%93.txt
 https://raw.githubusercontent.com/xiaoran67/update/refs/heads/main/output/freetv/freetv_output.txt
