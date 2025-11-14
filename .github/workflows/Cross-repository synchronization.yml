@@ -39,7 +39,7 @@ on:
         description: '目标仓库Token的Secret名称'
         type: string
         required: false
-        default: 'CUSTOM67_GITHUB_TOKEN'
+        default: 'XIAORAN29_GITHUB_TOKEN'
       
       sync_strategy:
         description: '同步策略'
