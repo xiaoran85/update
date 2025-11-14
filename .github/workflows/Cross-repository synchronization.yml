@@ -13,7 +13,7 @@ on:
         description: '源仓库同步路径（留空=根目录）'
         type: string
         required: false
-        default: ''
+        default: 'Folder'
       source_token_name:
         description: '源仓库Token的Secret名称'
         type: string
@@ -29,7 +29,7 @@ on:
         description: '目标仓库接收路径（留空=根目录）'
         type: string
         required: false
-        default: ''
+        default: 'Folder'
       target_private:
         description: '目标仓库是否私有'
         type: boolean
