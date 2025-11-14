@@ -1,4 +1,4 @@
-name: /Update Cross-repository synchronization
+name: Cross-repository synchronization
 # 跨仓库同步（高效增量+覆盖）
 # Cross-repository synchronization（时间戳+大小双校验，适配500MB级文件）
 
