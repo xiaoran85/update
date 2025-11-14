@@ -1,4 +1,4 @@
-name: 'Daily Update main² ☞ ✔'
+name: 'Live Stream Subscription Update main²'
 on:
   schedule:
     - cron: '20 21 * * *'  # UTC时间每日17:20自动触发
